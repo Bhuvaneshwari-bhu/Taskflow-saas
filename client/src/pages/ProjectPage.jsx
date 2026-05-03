@@ -5,6 +5,7 @@ import api from '../services/api'
 import useRole from '../hooks/useRole'
 import useProjectSocket from '../hooks/useProjectSocket'
 import { useToast, ToastContainer } from '../components/Toast'
+import { useAuth } from '../context/AuthContext'
 import KanbanColumn from '../components/KanbanColumn'
 import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
@@ -23,8 +24,18 @@ export default function ProjectPage() {
   const [error, setError]                   = useState('')
   const [refreshTrigger, setRefreshTrigger] = useState(0)
 
-  const { isOwner }                  = useRole(project)
+  const { isOwner }                        = useRole(project)
   const { toasts, showToast, removeToast } = useToast()
+  const { user: currentUser }              = useAuth()
+
+  const memberLabel = (memberId) => {
+    const id = String(memberId)
+    if (currentUser && id === String(currentUser._id)) {
+      return `${currentUser.name || 'You'} (you)`
+    }
+    const isOwnerMember = id === String(project?.owner?._id ?? project?.owner)
+    return `${isOwnerMember ? 'Owner' : 'User'} - ${id.slice(-4)}`
+  }
 
   const refresh = () => setRefreshTrigger(n => n + 1)
 
@@ -52,6 +63,7 @@ export default function ProjectPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [newTitle, setNewTitle]     = useState('')
   const [newDesc, setNewDesc]       = useState('')
+  const [newAssignTo, setNewAssignTo] = useState('')
   const [creating, setCreating]     = useState(false)
 
   // Assign modal
@@ -114,6 +126,10 @@ export default function ProjectPage() {
 
     onMemberAdded() {
       showToast('New member added', 'success')
+      api.get('/projects').then(({ data }) => {
+        const found = (data.projects || []).find(p => p._id === projectId)
+        if (found) setProject(found)
+      }).catch(() => {})
       refresh()
     },
 
@@ -169,9 +185,24 @@ export default function ProjectPage() {
     setCreating(true)
     try {
       const { data } = await api.post('/tasks', { title: newTitle, description: newDesc, projectId })
-      setTasks(prev => prev.some(t => t._id === data.task._id) ? prev : [data.task, ...prev])
+      let createdTask = data.task
+
+      if (newAssignTo) {
+        try {
+          const { data: assignData } = await api.put(`/tasks/${createdTask._id}/assign`, { userId: newAssignTo })
+          createdTask = assignData.task
+        } catch { /* assignment failed, task still created */ }
+      }
+
+      setTasks(prev => {
+        if (prev.some(t => t._id === createdTask._id)) {
+          return prev.map(t => t._id === createdTask._id ? createdTask : t)
+        }
+        return [createdTask, ...prev]
+      })
       setNewTitle('')
       setNewDesc('')
+      setNewAssignTo('')
       setShowCreate(false)
       refresh()
     } catch (err) {
@@ -184,7 +215,7 @@ export default function ProjectPage() {
   async function handleAssign(e) {
     e.preventDefault()
     if (!isOwner) return setError('Only the project owner can assign tasks')
-    if (!assignUserId.trim()) return
+    if (!assignUserId) return
     setAssigning(true)
     try {
       const { data } = await api.put(`/tasks/${assignTask._id}/assign`, { userId: assignUserId })
@@ -328,7 +359,7 @@ export default function ProjectPage() {
 
       {/* Create task modal */}
       {showCreate && (
-        <Modal title="New Task" onClose={() => setShowCreate(false)}>
+        <Modal title="New Task" onClose={() => { setShowCreate(false); setNewAssignTo('') }}>
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Title *</label>
@@ -351,10 +382,28 @@ export default function ProjectPage() {
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Assign To</label>
+              <select
+                value={newAssignTo}
+                onChange={e => setNewAssignTo(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="">Unassigned</option>
+                {(project?.members || []).map(memberId => {
+                  const id = String(memberId)
+                  return (
+                    <option key={id} value={id}>
+                      {memberLabel(id)}
+                    </option>
+                  )
+                })}
+              </select>
+            </div>
             <div className="flex gap-2 justify-end pt-1">
               <button
                 type="button"
-                onClick={() => setShowCreate(false)}
+                onClick={() => { setShowCreate(false); setNewAssignTo('') }}
                 className="px-4 py-2 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
               >
                 Cancel
@@ -379,14 +428,23 @@ export default function ProjectPage() {
           </p>
           <form onSubmit={handleAssign} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">User ID</label>
-              <input
+              <label className="block text-sm font-medium text-slate-700 mb-1">Assign To</label>
+              <select
                 value={assignUserId}
                 onChange={e => setAssignUserId(e.target.value)}
                 autoFocus
-                placeholder="Paste user ObjectId"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500"
-              />
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-green-500 bg-white"
+              >
+                <option value="">Select a member…</option>
+                {(project?.members || []).map(memberId => {
+                  const id = String(memberId)
+                  return (
+                    <option key={id} value={id}>
+                      {memberLabel(id)}
+                    </option>
+                  )
+                })}
+              </select>
             </div>
             <div className="flex gap-2 justify-end">
               <button
