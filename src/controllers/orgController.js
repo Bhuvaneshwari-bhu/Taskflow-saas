@@ -1,5 +1,15 @@
 const mongoose = require('mongoose');
-const { createOrg, getOrgs, getOrg, addMember, removeMember } = require('../services/orgService');
+const {
+    createOrg,
+    getOrgs,
+    getOrg,
+    addMember,
+    removeMember,
+    getOrgByInviteCode,
+    joinByInviteCode,
+    getOrCreateInviteCode,
+    rotateInviteCode,
+} = require('../services/orgService');
 const { logActivity, ACTIONS } = require('../utils/logActivity');
 
 const create = async (req, res) => {
@@ -97,4 +107,53 @@ const removeOrgMember = async (req, res) => {
     }
 };
 
-module.exports = { create, getAll, getOne, addOrgMember, removeOrgMember };
+// ── Invite code ────────────────────────────────────────────────────────────────
+
+// GET /org/join/:code — preview org info before joining
+const getInviteInfo = async (req, res) => {
+    try {
+        const org = await getOrgByInviteCode(req.params.code);
+        if (!org) return res.status(404).json({ success: false, message: 'Invalid invite code' });
+        res.json({ success: true, org: { _id: org._id, name: org.name, memberCount: org.members.length } });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// POST /org/join — join via invite code
+const joinOrg = async (req, res) => {
+    try {
+        const { inviteCode } = req.body;
+        if (!inviteCode?.trim()) {
+            return res.status(400).json({ success: false, message: 'Invite code is required' });
+        }
+        const org = await joinByInviteCode(req.user, inviteCode.trim().toLowerCase());
+        res.status(200).json({ success: true, org });
+    } catch (err) {
+        res.status(err.status || 500).json({ success: false, message: err.message });
+    }
+};
+
+// GET /org/:orgId/invite — get invite code (admin only)
+const getOrgInvite = async (req, res) => {
+    try {
+        const inviteCode = await getOrCreateInviteCode(req.params.orgId);
+        if (!inviteCode) return res.status(404).json({ success: false, message: 'Organization not found' });
+        res.json({ success: true, inviteCode });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// POST /org/:orgId/invite/regenerate — reset invite link (admin only)
+const regenerateInvite = async (req, res) => {
+    try {
+        const inviteCode = await rotateInviteCode(req.params.orgId);
+        if (!inviteCode) return res.status(404).json({ success: false, message: 'Organization not found' });
+        res.json({ success: true, inviteCode });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+module.exports = { create, getAll, getOne, addOrgMember, removeOrgMember, getInviteInfo, joinOrg, getOrgInvite, regenerateInvite };

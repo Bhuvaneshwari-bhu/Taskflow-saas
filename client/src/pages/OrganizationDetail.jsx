@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import { useOrg } from '../context/OrgContext'
 import Spinner from '../components/Spinner'
 
 function RoleBadge({ role }) {
@@ -31,6 +32,8 @@ export default function OrganizationDetail() {
   const navigate      = useNavigate()
   const { user } = useAuth()
 
+  const { setActiveOrg }  = useOrg()
+
   const [org, setOrg]         = useState(null)
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
@@ -41,6 +44,12 @@ export default function OrganizationDetail() {
   const [addRole, setAddRole]     = useState('member')
   const [adding, setAdding]       = useState(false)
   const [addError, setAddError]   = useState('')
+
+  // Invite code (admin only)
+  const [inviteCode, setInviteCode]   = useState(null)
+  const [loadingCode, setLoadingCode] = useState(false)
+  const [copied, setCopied]           = useState(false)
+  const [rotating, setRotating]       = useState(false)
 
   // Create project form
   const [showProjectForm, setShowProjectForm]   = useState(false)
@@ -55,6 +64,42 @@ export default function OrganizationDetail() {
 
   useEffect(() => { loadAll() }, [orgId])
 
+  const loadInviteCode = useCallback(async () => {
+    setLoadingCode(true)
+    try {
+      const { data } = await api.get(`/org/${orgId}/invite`)
+      setInviteCode(data.inviteCode)
+    } catch {
+      // Non-critical — don't surface error for invite code fetch
+    } finally {
+      setLoadingCode(false)
+    }
+  }, [orgId])
+
+  useEffect(() => {
+    if (isAdmin) loadInviteCode()
+  }, [isAdmin, loadInviteCode])
+
+  async function handleCopyCode() {
+    if (!inviteCode) return
+    await navigator.clipboard.writeText(inviteCode)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function handleRotateCode() {
+    if (!confirm('Generate a new invite code? The old code will stop working.')) return
+    setRotating(true)
+    try {
+      const { data } = await api.post(`/org/${orgId}/invite/regenerate`)
+      setInviteCode(data.inviteCode)
+    } catch {
+      // ignore
+    } finally {
+      setRotating(false)
+    }
+  }
+
   async function loadAll() {
     setLoading(true)
     setError('')
@@ -64,8 +109,11 @@ export default function OrganizationDetail() {
         api.get(`/projects?orgId=${orgId}`),
       ])
       setOrg(orgRes.data.org)
+      setActiveOrg(orgRes.data.org)
       setProjects(projRes.data.projects || [])
     } catch (err) {
+      const status = err.response?.status
+      if (status === 403 || status === 404) setActiveOrg(null)
       setError(err.response?.data?.message || 'Failed to load organization')
     } finally {
       setLoading(false)
@@ -343,6 +391,49 @@ export default function OrganizationDetail() {
                 <p className="mt-5 pt-4 border-t border-slate-100 text-xs text-slate-400">
                   Only admins can manage members.
                 </p>
+              )}
+
+              {/* Invite code — admin only */}
+              {isAdmin && (
+                <div className="mt-5 pt-5 border-t border-slate-100">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+                    Invite Code
+                  </p>
+                  {loadingCode ? (
+                    <p className="text-xs text-slate-400">Loading…</p>
+                  ) : inviteCode ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                        <span className="flex-1 text-sm font-mono text-slate-700 tracking-wider select-all">
+                          {inviteCode}
+                        </span>
+                        <button
+                          onClick={handleCopyCode}
+                          title="Copy invite code"
+                          className="shrink-0 text-slate-400 hover:text-blue-500 transition-colors"
+                        >
+                          {copied ? (
+                            <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-xs text-slate-400">Share this code to invite people to this organization.</p>
+                      <button
+                        onClick={handleRotateCode}
+                        disabled={rotating}
+                        className="text-xs text-slate-400 hover:text-red-500 disabled:opacity-60 transition-colors"
+                      >
+                        {rotating ? 'Regenerating…' : '↺ Regenerate code'}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               )}
             </div>
           </div>

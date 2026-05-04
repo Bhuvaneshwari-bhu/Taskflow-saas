@@ -28,13 +28,16 @@ export default function ProjectPage() {
   const { toasts, showToast, removeToast } = useToast()
   const { user: currentUser }              = useAuth()
 
-  const memberLabel = (memberId) => {
-    const id = String(memberId)
-    if (currentUser && id === String(currentUser._id)) {
-      return `${currentUser.name || 'You'} (you)`
-    }
-    const isOwnerMember = id === String(project?.owner?._id ?? project?.owner)
-    return `${isOwnerMember ? 'Owner' : 'User'} - ${id.slice(-4)}`
+  // Resolves a member entry (populated object or plain ID string) to a display name.
+  const memberLabel = (memberOrId) => {
+    const id   = memberOrId?._id ? String(memberOrId._id) : String(memberOrId)
+    const name = memberOrId?.name
+    const email = memberOrId?.email
+    if (id === String(currentUser?._id)) return `${name || currentUser.name || 'You'} (you)`
+    if (name)  return name
+    if (email) return email.split('@')[0]
+    const ownerId = String(project?.owner?._id ?? project?.owner)
+    return `${id === ownerId ? 'Owner' : 'User'} ·${id.slice(-4)}`
   }
 
   const refresh = () => setRefreshTrigger(n => n + 1)
@@ -49,7 +52,8 @@ export default function ProjectPage() {
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = !searchTerm || task.title.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = selectedStatus === 'all' || task.status === selectedStatus
-    const matchesUser   = !assignedFilter || String(task.assignedTo || '').toLowerCase().includes(assignedFilter.toLowerCase())
+    const assignedId    = task.assignedTo?._id ? String(task.assignedTo._id) : String(task.assignedTo || '')
+    const matchesUser   = !assignedFilter || assignedId.toLowerCase().includes(assignedFilter.toLowerCase())
     return matchesSearch && matchesStatus && matchesUser
   })
 
@@ -83,9 +87,8 @@ export default function ProjectPage() {
   useEffect(() => {
     async function init() {
       try {
-        const [projRes] = await Promise.all([api.get('/projects'), fetchTasks()])
-        const found = (projRes.data.projects || []).find(p => p._id === projectId)
-        setProject(found || { name: 'Project', _id: projectId })
+        const [projRes] = await Promise.all([api.get(`/projects/${projectId}`), fetchTasks()])
+        setProject(projRes.data.project || { name: 'Project', _id: projectId })
       } catch {
         setError('Failed to load project')
       } finally {
@@ -110,7 +113,6 @@ export default function ProjectPage() {
 
     onTaskUpdated(task) {
       setTasks(prev => prev.map(t => t._id === task._id ? task : t))
-      showToast('Task updated', 'info')
       refresh()
     },
 
@@ -126,9 +128,8 @@ export default function ProjectPage() {
 
     onMemberAdded() {
       showToast('New member added', 'success')
-      api.get('/projects').then(({ data }) => {
-        const found = (data.projects || []).find(p => p._id === projectId)
-        if (found) setProject(found)
+      api.get(`/projects/${projectId}`).then(({ data }) => {
+        if (data.project) setProject(data.project)
       }).catch(() => {})
       refresh()
     },
@@ -341,7 +342,7 @@ export default function ProjectPage() {
                     onAssign={task => {
                       if (!isOwner) return setError('Only the project owner can assign tasks')
                       setAssignTask(task)
-                      setAssignUserId(task.assignedTo || '')
+                      setAssignUserId(task.assignedTo?._id ? String(task.assignedTo._id) : (task.assignedTo || ''))
                     }}
                   />
                 ))}
@@ -390,11 +391,11 @@ export default function ProjectPage() {
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
               >
                 <option value="">Unassigned</option>
-                {(project?.members || []).map(memberId => {
-                  const id = String(memberId)
+                {(project?.members || []).map(member => {
+                  const id = member?._id ? String(member._id) : String(member)
                   return (
                     <option key={id} value={id}>
-                      {memberLabel(id)}
+                      {memberLabel(member)}
                     </option>
                   )
                 })}
@@ -436,11 +437,11 @@ export default function ProjectPage() {
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-green-500 bg-white"
               >
                 <option value="">Select a member…</option>
-                {(project?.members || []).map(memberId => {
-                  const id = String(memberId)
+                {(project?.members || []).map(member => {
+                  const id = member?._id ? String(member._id) : String(member)
                   return (
                     <option key={id} value={id}>
-                      {memberLabel(id)}
+                      {memberLabel(member)}
                     </option>
                   )
                 })}

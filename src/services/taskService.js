@@ -28,6 +28,7 @@ const getTasks = async(projectId) => {
     if (cached) return cached;
 
     const tasks = await Task.find({ project: projectId })
+        .populate('assignedTo', 'name email')
         .sort({ createdAt: -1 })
         .lean();
 
@@ -38,7 +39,8 @@ const getTasks = async(projectId) => {
 const updateTask = async(taskId, status) => {
     if (!mongoose.Types.ObjectId.isValid(taskId)) return null;
 
-    const task = await Task.findByIdAndUpdate(taskId, { status }, { new: true });
+    const task = await Task.findByIdAndUpdate(taskId, { status }, { new: true })
+        .populate('assignedTo', 'name email');
 
     if (task) {
         await deleteCache(KEYS.projectTasks(task.project.toString()));
@@ -66,7 +68,8 @@ const assignTask = async(taskId, userId) => {
         !mongoose.Types.ObjectId.isValid(userId)
     ) return null;
 
-    const task = await Task.findByIdAndUpdate(taskId, { assignedTo: userId }, { new: true });
+    const task = await Task.findByIdAndUpdate(taskId, { assignedTo: userId }, { new: true })
+        .populate('assignedTo', 'name email');
 
     if (task) {
         await deleteCache(KEYS.projectTasks(task.project.toString()));

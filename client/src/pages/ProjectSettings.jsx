@@ -8,21 +8,30 @@ import Spinner from '../components/Spinner'
 
 export default function ProjectSettings() {
   const { id: projectId } = useParams()
-  const navigate          = useNavigate()
-  const { user }          = useAuth()
+  const navigate           = useNavigate()
+  const { user }           = useAuth()
 
-  const [project, setProject] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState('')
+  const [project, setProject]     = useState(null)
+  const [orgMembers, setOrgMembers] = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState('')
 
   const { isOwner } = useRole(project)
 
-  async function fetchProject() {
+  async function fetchAll() {
+    setError('')
     try {
-      const { data } = await api.get('/projects')
-      const found = (data.projects || []).find(p => p._id === projectId)
-      if (found) setProject(found)
-      else setError('Project not found')
+      const { data: projData } = await api.get(`/projects/${projectId}`)
+      setProject(projData.project)
+
+      if (projData.project?.orgId) {
+        try {
+          const { data: orgData } = await api.get(`/org/${projData.project.orgId}`)
+          setOrgMembers(orgData.org?.members || [])
+        } catch {
+          // org fetch failing is non-fatal — dropdown will be empty
+        }
+      }
     } catch {
       setError('Failed to load project')
     } finally {
@@ -30,7 +39,7 @@ export default function ProjectSettings() {
     }
   }
 
-  useEffect(() => { fetchProject() }, [projectId])
+  useEffect(() => { fetchAll() }, [projectId])
 
   if (loading) return (
     <div className="flex flex-1 items-center justify-center py-32">
@@ -95,8 +104,9 @@ export default function ProjectSettings() {
           {project && (
             <MemberList
               project={project}
+              orgMembers={orgMembers}
               isOwner={isOwner}
-              onMemberAdded={fetchProject}
+              onMemberAdded={fetchAll}
             />
           )}
         </section>
@@ -130,11 +140,11 @@ export default function ProjectSettings() {
 }
 
 function Badge({ label, allowed, active }) {
-  const base = 'text-xs px-2 py-0.5 rounded-full border font-medium'
+  const base  = 'text-xs px-2 py-0.5 rounded-full border font-medium'
   const style = allowed
     ? 'bg-green-50 text-green-700 border-green-200'
     : 'bg-slate-50 text-slate-400 border-slate-200'
-  const ring = active ? 'ring-2 ring-offset-1 ring-blue-300' : ''
+  const ring  = active ? 'ring-2 ring-offset-1 ring-blue-300' : ''
   return (
     <span className={`${base} ${style} ${ring}`}>
       {allowed ? '✓' : '✗'} {label}

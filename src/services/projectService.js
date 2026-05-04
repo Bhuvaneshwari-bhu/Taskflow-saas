@@ -8,10 +8,14 @@ const getProject = async (projectId) => {
     return Project.findById(projectId);
 };
 
+const getProjectWithMembers = (projectId) => {
+    return Project.findById(projectId)
+        .populate('members', 'name email')
+        .populate('owner', 'name email');
+};
+
 /**
  * Cache-aside: check Redis → on miss, query DB and populate cache.
- * Returns plain objects after the first cache round-trip (JSON round-trip
- * strips Mongoose document methods, which is fine — callers only read fields).
  */
 const getProjects = async (userId) => {
     const key    = KEYS.userProjects(userId);
@@ -48,34 +52,28 @@ const createProject = async ({ name, description, ownerId, orgId }) => {
         ...(orgId && { orgId }),
     });
 
-    // Owner's project list now has one more entry
     await deleteCache(KEYS.userProjects(ownerId));
     if (orgId) await deleteCache(KEYS.orgProjects(orgId));
 
     return project;
 };
 
-// invitedBy is the requesting user's id (string) — used for the email job payload
 const addMember = async (projectId, userId, invitedBy = null) => {
     const project = await Project.findByIdAndUpdate(
         projectId,
         { $addToSet: { members: userId } },
         { new: true }
-    );
+    ).populate('members', 'name email').populate('owner', 'name email');
 
     if (project) {
-        // New member can now see this project — their list is stale
         await deleteCache(KEYS.userProjects(userId));
-        // Owner's cached project object has a stale members array
-        await deleteCache(KEYS.userProjects(project.owner.toString()));
-        // Org list also has a stale member count for this project
+        await deleteCache(KEYS.userProjects(project.owner._id.toString()));
         if (project.orgId) await deleteCache(KEYS.orgProjects(project.orgId.toString()));
 
-        // Queue invite email — fire and forget; Redis failure must not block the response
         emailQueue.add('sendInviteEmail', {
-            email:       `user:${userId}`,   // swap for real user email when User is populated
+            email:       `user:${userId}`,
             projectName: project.name,
-            invitedBy:   invitedBy ? invitedBy.toString() : project.owner.toString(),
+            invitedBy:   invitedBy ? invitedBy.toString() : project.owner._id.toString(),
         }).then((job) => {
             console.log(`[queue:email] job ${job.id} added — sendInviteEmail for user ${userId}`);
         }).catch((err) => {
@@ -100,6 +98,7 @@ const isProjectMember = async (userId, projectId) => {
 
 module.exports = {
     getProject,
+    getProjectWithMembers,
     createProject,
     getProjects,
     getProjectsByOrg,

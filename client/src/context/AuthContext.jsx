@@ -34,6 +34,7 @@ export function AuthProvider({ children }) {
     } finally {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
+      localStorage.removeItem('activeOrg')
       setToken('')
       setUser(null)
     }

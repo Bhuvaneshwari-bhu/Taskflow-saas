@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { OrgProvider }           from './context/OrgContext'
 import AppLayout          from './layouts/AppLayout'
 import LoginPage          from './pages/LoginPage'
 import SignupPage         from './pages/SignupPage'
@@ -27,25 +28,27 @@ function PublicRoute({ children }) {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* ── Public ─────────────────────────────────────────────── */}
-          <Route path="/login"  element={<PublicRoute><LoginPage /></PublicRoute>} />
-          <Route path="/signup" element={<PublicRoute><SignupPage /></PublicRoute>} />
+      <OrgProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* ── Public ──────────────────────────────────────── */}
+            <Route path="/login"  element={<PublicRoute><LoginPage /></PublicRoute>} />
+            <Route path="/signup" element={<PublicRoute><SignupPage /></PublicRoute>} />
 
-          {/* ── Protected (all wrapped in AppLayout via ProtectedRoute) */}
-          <Route path="/organizations"        element={<ProtectedRoute><OrganizationsPage /></ProtectedRoute>} />
-          <Route path="/org/:id"              element={<ProtectedRoute><OrganizationDetail /></ProtectedRoute>} />
-          <Route path="/org/:id/activity"     element={<ProtectedRoute><ActivityPage /></ProtectedRoute>} />
-          <Route path="/dashboard"            element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-          <Route path="/project/:id"          element={<ProtectedRoute><ProjectPage /></ProtectedRoute>} />
-          <Route path="/project/:id/settings" element={<ProtectedRoute><ProjectSettings /></ProtectedRoute>} />
-          <Route path="/profile"              element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+            {/* ── Protected ───────────────────────────────────── */}
+            <Route path="/organizations"        element={<ProtectedRoute><OrganizationsPage /></ProtectedRoute>} />
+            <Route path="/org/:id"              element={<ProtectedRoute><OrganizationDetail /></ProtectedRoute>} />
+            <Route path="/org/:id/activity"     element={<ProtectedRoute><ActivityPage /></ProtectedRoute>} />
+            <Route path="/dashboard"            element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+            <Route path="/project/:id"          element={<ProtectedRoute><ProjectPage /></ProtectedRoute>} />
+            <Route path="/project/:id/settings" element={<ProtectedRoute><ProjectSettings /></ProtectedRoute>} />
+            <Route path="/profile"              element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
-          {/* ── Catch-all ───────────────────────────────────────────── */}
-          <Route path="*" element={<Navigate to="/organizations" replace />} />
-        </Routes>
-      </BrowserRouter>
+            {/* ── Catch-all ────────────────────────────────────── */}
+            <Route path="*" element={<Navigate to="/organizations" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </OrgProvider>
     </AuthProvider>
   )
 }

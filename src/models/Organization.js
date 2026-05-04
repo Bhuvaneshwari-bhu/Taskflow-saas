@@ -6,9 +6,10 @@ const memberSchema = new mongoose.Schema({
 }, { _id: false });
 
 const organizationSchema = new mongoose.Schema({
-    name:    { type: String, required: true, trim: true },
-    owner:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    members: [memberSchema],
+    name:       { type: String, required: true, trim: true },
+    owner:      { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    members:    [memberSchema],
+    inviteCode: { type: String, unique: true, sparse: true },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Organization', organizationSchema);
