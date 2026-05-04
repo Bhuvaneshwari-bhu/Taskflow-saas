@@ -16,15 +16,8 @@ const app = express();
 
 // Allow the frontend origin (comma-separated list in CLIENT_URL for multiple).
 // credentials:true is required so the httpOnly refresh-token cookie is accepted.
-const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173,http://localhost:4173')
-  .split(',')
-  .map(o => o.trim())
-
 app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true)
-    cb(new Error(`CORS: origin ${origin} not allowed`))
-  },
+  origin: true,
   credentials: true,
 }));
 app.use(express.json());
