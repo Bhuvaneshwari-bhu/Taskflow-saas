@@ -5,6 +5,17 @@
 A full-stack **SaaS-based project management platform** that enables organizations to manage projects, tasks, and team collaboration with secure authentication, caching, background jobs, and cloud-based media handling.
 
 ---
+## 🚀 Live Deployment
+
+The application is fully deployed and accessible online:
+
+* **Frontend (Vercel):** Vercel
+  👉 [https://taskflow-saas-frontend-81ktwus0x-bhu1.vercel.app](https://taskflow-saas-frontend-81ktwus0x-bhu1.vercel.app)
+
+* **Backend API (Render):** Render
+  👉 [https://taskflow-saas-backend-s4ee.onrender.com](https://taskflow-saas-backend-s4ee.onrender.com)
+
+---
 
 # 📌 Features
 
@@ -345,6 +356,51 @@ This project demonstrates a **complete SaaS lifecycle**:
 ```text
 Authentication → Multi-tenancy → Collaboration → Task workflow → Performance optimization
 ```
+
+---
+
+Add it cleanly and professionally—don’t just say “deployed,” show links + stack.
+
+Copy-paste this into your README:
+
+---
+
+
+## 🏗️ Deployment Architecture
+
+* Frontend is deployed on **Vercel** for fast global delivery and automatic CI/CD.
+* Backend is deployed on **Render** as a Node.js service.
+* Database is hosted on **MongoDB Atlas** (cloud-managed NoSQL database).
+* Redis (Upstash) is used for caching and background queue handling.
+
+---
+
+## ⚙️ Environment & Configuration
+
+* Environment variables are securely managed on both Vercel and Render.
+* CORS is configured to allow communication between frontend and backend.
+* API base URL is dynamically configured using environment variables.
+
+---
+
+## 🔁 CI/CD Workflow
+
+* Code is pushed to GitHub.
+* Vercel automatically deploys frontend changes.
+* Render automatically deploys backend updates.
+* No manual deployment steps required.
+
+---
+
+## 🌐 Key Highlights
+
+* Fully working production deployment
+* Handles real-world issues like:
+
+  * CORS configuration
+  * Environment variable management
+  * API routing across domains
+* Scalable architecture with separate frontend and backend services
 
 ---
 
