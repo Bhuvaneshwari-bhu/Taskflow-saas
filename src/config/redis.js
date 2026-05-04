@@ -4,43 +4,57 @@ let client = null;
 
 /**
  * Creates and connects the Redis client.
- * Called once in server.js during startup.
- * All cache helpers read the client via getClient().
+ * Safe for production:
+ * - Supports Upstash (TLS)
+ * - Does not crash if Redis fails
+ * - Gracefully degrades to no-cache mode
  */
 const connectRedis = () => {
-    client = new Redis({
-        host:     process.env.REDIS_HOST     || '127.0.0.1',
-        port:     parseInt(process.env.REDIS_PORT) || 6379,
-        password: process.env.REDIS_PASSWORD || undefined,
+    try {
+        // If no Redis config → skip completely
+        if (!process.env.REDIS_HOST || !process.env.REDIS_PASSWORD) {
+            console.warn('[redis] skipped (no config)');
+            return null;
+        }
 
-        // Retry up to 3 times with exponential backoff, then stop.
-        // The app runs fine without Redis — cache just degrades to DB fallback.
-        retryStrategy: (times) => {
-            if (times > 3) {
-                console.warn('[redis] max retries reached — running without cache');
-                return null; // stops retrying; client enters error state
-            }
-            return Math.min(times * 200, 2000);
-        },
+        client = new Redis({
+            host: process.env.REDIS_HOST,
+            port: parseInt(process.env.REDIS_PORT) || 6379,
+            password: process.env.REDIS_PASSWORD,
 
-        // Do not crash the process on connection failure
-        enableOfflineQueue: false,
-        lazyConnect: false,
-    });
+            // 🔥 REQUIRED for Upstash (TLS connection)
+            tls: {},
 
-    client.on('connect', () => {
-        console.log('[redis] connected');
-    });
+            retryStrategy: (times) => {
+                if (times > 3) {
+                    console.warn('[redis] max retries reached — running without cache');
+                    return null;
+                }
+                return Math.min(times * 200, 2000);
+            },
 
-    client.on('error', (err) => {
-        // Log but never throw — cache errors must not bring down the app
-        console.error(`[redis] error: ${err.message}`);
-    });
+            enableOfflineQueue: false,
+            lazyConnect: false,
+        });
 
-    return client;
+        client.on('connect', () => {
+            console.log('[redis] connected');
+        });
+
+        client.on('error', (err) => {
+            console.error(`[redis] error: ${err.message}`);
+        });
+
+        return client;
+
+    } catch (err) {
+        console.error('[redis] failed to initialize:', err.message);
+        client = null;
+        return null;
+    }
 };
 
-/** Returns the active Redis client, or null if not yet initialised. */
+/** Returns the active Redis client, or null if unavailable */
 const getClient = () => client;
 
 module.exports = { connectRedis, getClient };
