@@ -22,7 +22,6 @@ const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173,http://
 
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow server-to-server calls (no origin header) and listed origins
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true)
     cb(new Error(`CORS: origin ${origin} not allowed`))
   },
